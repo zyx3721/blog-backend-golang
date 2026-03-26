@@ -7,8 +7,8 @@
 ```bash
 mkdir -p nginx/certs
 # 将你的证书文件放入 nginx/certs 目录
-# - fullchain.pem (证书链)
-# - privkey.pem (私钥)
+# - fullchain.pem（证书链）
+# - privkey.pem（私钥）
 ```
 
 ### 2. 创建环境变量文件
@@ -80,17 +80,21 @@ UPDATE users SET role = 'admin' WHERE email = 'your-email@example.com';
 
 ## 端口说明
 
-- 80: HTTP (自动重定向到 HTTPS)
-- 443: HTTPS
-- 3306: MySQL (可选，生产环境建议关闭)
-- 6379: Redis (可选，生产环境建议关闭)
-- 8080: 后端 API (内部)
-- 3000: 前端 (内部)
+| 端口 | 协议 | 说明 |
+|------|------|------|
+| 80 | HTTP | 自动重定向到 HTTPS |
+| 443 | HTTPS | 主入口 |
+| 3306 | TCP | MySQL（生产环境建议关闭） |
+| 6379 | TCP | Redis（生产环境建议关闭） |
+| 8080 | HTTP | 后端 API（内部） |
+| 3000 | HTTP | 前端（内部） |
 
 ## 常见问题
 
 ### 1. 数据库连接失败
+
 等待 MySQL 完全启动后再启动后端服务：
+
 ```bash
 docker-compose up -d mysql redis
 # 等待 30 秒
@@ -98,14 +102,18 @@ docker-compose up -d
 ```
 
 ### 2. 证书问题
+
 确保证书文件权限正确：
+
 ```bash
 chmod 644 nginx/certs/fullchain.pem
 chmod 600 nginx/certs/privkey.pem
 ```
 
 ### 3. 前端构建失败
+
 清理并重新构建：
+
 ```bash
 docker-compose down
 docker system prune -f
