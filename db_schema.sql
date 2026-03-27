@@ -136,6 +136,22 @@ CREATE TABLE `favorites` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------
+-- Table structure for donation_qr_codes
+-- ----------------------------
+DROP TABLE IF EXISTS `donation_qr_codes`;
+CREATE TABLE `donation_qr_codes` (
+  `id` varchar(191) NOT NULL,
+  `name` longtext,
+  `icon` longtext,
+  `qrcode_url` longtext,
+  `sort_order` bigint(20) DEFAULT 0,
+  `enabled` tinyint(1) DEFAULT 1,
+  `created_at` datetime(3) DEFAULT NULL,
+  `updated_at` datetime(3) DEFAULT NULL,
+  PRIMARY KEY (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------------
 -- Insert Default Data
 -- ----------------------------
 -- Insert Default Data

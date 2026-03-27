@@ -30,7 +30,7 @@ func main() {
 	}
 
 	// 自动迁移表
-	if err := db.AutoMigrate(
+	if err := db.Set("gorm:table_options", "ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci").AutoMigrate(
 		&models.User{},
 		&models.Category{},
 		&models.Tag{},
