@@ -92,9 +92,13 @@ func (h *Handlers) FetchArticleByURL(c *gin.Context) {
 		for _, attr := range lazyAttrs {
 			if val, exists := s.Attr(attr); exists && val != "" {
 				s.SetAttr("src", val)
+				s.RemoveAttr(attr) // 已转换为 src，移除原懒加载属性
 				break 
 			}
 		}
+
+		// 移除多重资源的限制，防止现代浏览器优先请求 srcset 导致被屏蔽
+		s.RemoveAttr("srcset")
 
 		if src, exists := s.Attr("src"); exists && strings.TrimSpace(src) != "" {
 			// 使用 Go 标准库的 ResolveReference 完美处理一切相对路径（包括无前缀的目录名、./、../、// 等）
@@ -111,13 +115,17 @@ func (h *Handlers) FetchArticleByURL(c *gin.Context) {
 		}
 	})
 
-	// 并发下载图片替换资源防盗链
+	// 并发下载图片替换资源防盗链 (最多并发2个，防止触发防采集限制)
 	var wg sync.WaitGroup
 	var mu sync.Mutex
+	semaphore := make(chan struct{}, 2)
 	for _, item := range imgsToDownload {
 		wg.Add(1)
+		semaphore <- struct{}{}
 		go func(img imgProcess) {
 			defer wg.Done()
+			defer func() { <-semaphore }()
+
 			localPath, err := downloadImage(client, img.src, req.URL)
 			if err == nil {
 				mu.Lock()
@@ -128,6 +136,8 @@ func (h *Handlers) FetchArticleByURL(c *gin.Context) {
 					fallbackCover = localPath
 				}
 				mu.Unlock()
+			} else {
+				fmt.Printf("[Crawler] Failed to download image %s: %v\n", img.src, err)
 			}
 		}(item)
 	}
@@ -226,9 +236,16 @@ func downloadImage(client *http.Client, urlStr string, referer string) (string, 
 	if err != nil {
 		return "", err
 	}
-	// 模拟正常浏览器请求和原始 Referer 绕过防盗链
+	// 解析图片 URL，构造同源 Referer 轻松骗过防盗链
+	imgURI, _ := url.Parse(urlStr)
+	fakeReferer := referer
+	if imgURI != nil {
+		fakeReferer = fmt.Sprintf("%s://%s/", imgURI.Scheme, imgURI.Host)
+	}
+
+	// 模拟正常浏览器请求和伪装 Referer 绕过防盗链
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
-	req.Header.Set("Referer", referer)
+	req.Header.Set("Referer", fakeReferer)
 	req.Header.Set("Accept", "image/avif,image/webp,image/apng,image/*,*/*;q=0.8")
 
 	resp, err := client.Do(req)
