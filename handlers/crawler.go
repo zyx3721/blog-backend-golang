@@ -3,6 +3,7 @@ package handlers
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -83,13 +84,12 @@ func (h *Handlers) FetchArticleByURL(c *gin.Context) {
 			}
 		}
 
-		if src, exists := s.Attr("src"); exists && src != "" {
-			// 修复协议缺失或相对路径
-			if strings.HasPrefix(src, "//") {
-				src = "https:" + src
-				s.SetAttr("src", src)
-			} else if strings.HasPrefix(src, "/") {
-				src = fmt.Sprintf("%s://%s%s", parsedUrl.Scheme, parsedUrl.Host, src)
+		if src, exists := s.Attr("src"); exists && strings.TrimSpace(src) != "" {
+			// 使用 Go 标准库的 ResolveReference 完美处理一切相对路径（包括无前缀的目录名、./、../、// 等）
+			imgUrl, err := url.Parse(src)
+			if err == nil {
+				absUrl := parsedUrl.ResolveReference(imgUrl)
+				src = absUrl.String()
 				s.SetAttr("src", src)
 			}
 
