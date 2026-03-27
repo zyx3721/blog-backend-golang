@@ -7,6 +7,7 @@ import (
 	"time"
 
 	md "github.com/JohannesKaufmann/html-to-markdown"
+	"github.com/PuerkitoBio/goquery"
 	"github.com/gin-gonic/gin"
 	"github.com/go-shiori/go-readability"
 )
@@ -60,13 +61,55 @@ func (h *Handlers) FetchArticleByURL(c *gin.Context) {
 		return
 	}
 
-	// 3. 使用 go-readability 提取正文内容和标题
+	// 3. 使用 goquery 提前处理 HTML 中的图片（解决懒加载和相对路径）
 	parsedUrl, err := resp.Request.URL.Parse("")
 	if err != nil {
 		parsedUrl = resp.Request.URL
 	}
 
-	article, err := readability.FromReader(resp.Body, parsedUrl)
+	doc, err := goquery.NewDocumentFromReader(resp.Body)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to parse HTML document: %v", err)})
+		return
+	}
+
+	var fallbackCover string
+	lazyAttrs := []string{"data-src", "data-original", "data-lazy-src", "data-actualsrc", "origin-src", "data-src-retina", "v-lazy", "src-large"}
+	doc.Find("img").Each(func(i int, s *goquery.Selection) {
+		for _, attr := range lazyAttrs {
+			if val, exists := s.Attr(attr); exists && val != "" {
+				s.SetAttr("src", val)
+				break 
+			}
+		}
+
+		if src, exists := s.Attr("src"); exists && src != "" {
+			// 修复协议缺失或相对路径
+			if strings.HasPrefix(src, "//") {
+				src = "https:" + src
+				s.SetAttr("src", src)
+			} else if strings.HasPrefix(src, "/") {
+				src = fmt.Sprintf("%s://%s%s", parsedUrl.Scheme, parsedUrl.Host, src)
+				s.SetAttr("src", src)
+			}
+
+			// 获取第一张常规图片作为封面备选
+			if fallbackCover == "" && strings.HasPrefix(src, "http") {
+				if !strings.Contains(strings.ToLower(src), "icon") && !strings.Contains(strings.ToLower(src), "avatar") && !strings.Contains(strings.ToLower(src), "logo") {
+					fallbackCover = src
+				}
+			}
+		}
+	})
+
+	htmlStr, err := doc.Html()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate optimized HTML"})
+		return
+	}
+
+	// 提取正文内容和标题
+	article, err := readability.FromReader(strings.NewReader(htmlStr), parsedUrl)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("Failed to parse article content: %v", err)})
 		return
@@ -111,9 +154,17 @@ func (h *Handlers) FetchArticleByURL(c *gin.Context) {
 
 	// 6. 提取封面图片
 	coverImage := article.Image
-	if coverImage == "" && len(article.Favicon) > 0 {
-		// 如果没提取到大图，可以退一步不用 (因为favicon太小)，这里只用 Image
-		// 如果你想的话也可以自己用正则去取内容里第一张图片
+	if coverImage == "" {
+		coverImage = fallbackCover
+	}
+	
+	// 如果提取出来的封面是相对路径或双斜杠的缺省协议，做一层兜底修复
+	if coverImage != "" {
+		if strings.HasPrefix(coverImage, "//") {
+			coverImage = "https:" + coverImage
+		} else if strings.HasPrefix(coverImage, "/") {
+			coverImage = fmt.Sprintf("%s://%s%s", parsedUrl.Scheme, parsedUrl.Host, coverImage)
+		}
 	}
 
 	// 7. 返回给前端

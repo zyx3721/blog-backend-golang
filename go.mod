@@ -4,6 +4,7 @@ go 1.25.0
 
 require (
 	github.com/JohannesKaufmann/html-to-markdown v1.6.0
+	github.com/PuerkitoBio/goquery v1.12.0
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-shiori/go-readability v0.0.0-20251205110129-5db1dc9836f0
 	github.com/golang-jwt/jwt/v5 v5.0.0
@@ -26,7 +27,6 @@ require (
 )
 
 require (
-	github.com/PuerkitoBio/goquery v1.12.0 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
