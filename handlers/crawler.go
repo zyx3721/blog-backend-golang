@@ -121,7 +121,8 @@ func (h *Handlers) FetchArticleByURL(c *gin.Context) {
 			localPath, err := downloadImage(client, img.src, req.URL)
 			if err == nil {
 				mu.Lock()
-				img.selection.SetAttr("src", localPath)
+				// 防止 go-readability 把 "/uploads/..." 当作相对路径强行拼接上原网站域名，这里用一个假绝对路径占位
+				img.selection.SetAttr("src", "http://__local_asset__"+localPath)
 				// 获取第一张常规成功下载图片作为封面备选
 				if fallbackCover == "" && !strings.Contains(strings.ToLower(img.src), "icon") && !strings.Contains(strings.ToLower(img.src), "avatar") && !strings.Contains(strings.ToLower(img.src), "logo") {
 					fallbackCover = localPath
@@ -150,6 +151,9 @@ func (h *Handlers) FetchArticleByURL(c *gin.Context) {
 		c.JSON(http.StatusUnprocessableEntity, gin.H{"error": "No readable content found on this page"})
 		return
 	}
+
+	// 去除假域名占位符，还原出纯正的 /uploads/ 相对路径
+	article.Content = strings.ReplaceAll(article.Content, "http://__local_asset__", "")
 
 	// 4. 将 HTML 转换为 Markdown
 	converter := md.NewConverter("", true, nil)
